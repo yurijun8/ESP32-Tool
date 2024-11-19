@@ -7,7 +7,7 @@ ESP32 Tool é uma aplicação gráfica desenvolvida com Python e PyQt5 que facil
 ### Funcionalidades
 
 - **Seleção intuitiva de periféricos para os pinos disponíveis no ESP32**.
-- 
+  
 - **Suporte para diversos periféricos:**
     GPIO (Entrada e Saída)
     ADC (Conversor Analógico-Digital)
