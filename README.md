@@ -9,14 +9,14 @@ ESP32 Tool é uma aplicação gráfica desenvolvida com Python e PyQt5 que facil
 - **Seleção intuitiva de periféricos para os pinos disponíveis no ESP32**.
   
 - **Suporte para diversos periféricos:**
-    GPIO (Entrada e Saída)
-    ADC (Conversor Analógico-Digital)
-    DAC (Conversor Digital-Analógico)
-    UART
-    I2C (Master/Slave)
-    SPI (Master/Slave)
-    Touch Pad
-    Opções de ativação para Wi-Fi, Bluetooth e BLE, etc.
+    - GPIO (Entrada e Saída)
+    - ADC (Conversor Analógico-Digital)
+    - DAC (Conversor Digital-Analógico)
+    - UART
+    - I2C (Master/Slave)
+    - SPI (Master/Slave)
+    - Touch Pad
+    - Opções de ativação para Wi-Fi, Bluetooth e BLE, etc.
     
 - **Geração automática do código em C com:**
     Cabeçalho comentado.
