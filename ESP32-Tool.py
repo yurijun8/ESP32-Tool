@@ -373,12 +373,12 @@ class Ui_MainWindow(object):
                      "RX2", "TX2", "D18", "D19", "D21", "D22", "D23",
                      "D25", "D26", "D27", "D32", "D33"]
         input_only_pins = ["VP", "VN", "D34", "D35"]
-        adc_pins = ["D25", "D26", "D32", "D33", "D34", "D35", "VP", "VN"]
+        adc_pins = ["D25", "D26", "D27", "D14", "D12", "D13", "D4", "D2", "D15", "D32", "D33", "D34", "D35", "VP", "VN"]
         dac_pins = ["D25", "D26"]
         touch_pins = ["D4", "D2", "D15", "D13", "D12", "D14", "D27", "D33", "D32"]
 
         if pin in gpio_pins:
-            peripherals.extend(["GPIO_Input", "GPIO_Output"])
+            peripherals.extend(["GPIO_Input", "GPIO_Output", "PWM"])
         if pin in input_only_pins:
             peripherals.append("GPIO_Input")
         if pin in adc_pins:
@@ -413,6 +413,8 @@ class Ui_MainWindow(object):
         dac_initialized = set()
         spi_hspi_selected = False
         spi_vspi_selected = False
+        pwm_pins = []
+        next_pwm_channel = 0
 
         # Dicionários para mapear pinos SPI
         hspi_pins = {}
@@ -443,6 +445,14 @@ class Ui_MainWindow(object):
                     elif "VSPI" in peripheral:
                         spi_vspi_selected = True
                         vspi_pins[pin_name] = peripheral
+
+                # Coletar informações sobre PWM
+                if "PWM" in peripheral:
+                    if next_pwm_channel >= 8:
+                        QMessageBox.warning(None, "Erro", "Número máximo de canais PWM excedido (8).")
+                        return
+                    pwm_pins.append((pin_name, next_pwm_channel))
+                    next_pwm_channel += 1
 
         # Geração do cabeçalho do código
         header_comment = f"""/* Projeto: {project_name}
@@ -483,15 +493,21 @@ class Ui_MainWindow(object):
                     libraries.add("#include \"driver/spi_master.h\"  // Biblioteca para SPI")
                 if "Touch" in peripheral:
                     libraries.add("#include \"driver/touch_pad.h\"  // Biblioteca para Touch Pad")
+                if "PWM" in peripheral:
+                    libraries.add("#include \"driver/ledc.h\"  // Biblioteca para PWM")
 
         # Adicionar bibliotecas para Wi-Fi, Bluetooth e BLE
         if self.checkBox_wifi.isChecked():
             libraries.add("#include \"esp_wifi.h\"  // Biblioteca para Wi-Fi")
-        if self.checkBox_bluetooth.isChecked():
+            libraries.add("#include \"esp_event.h\"  // Biblioteca para eventos")
+            libraries.add("#include \"esp_netif.h\"  // Biblioteca para interface de rede")
+        if self.checkBox_bluetooth.isChecked() or self.checkBox_ble.isChecked():
             libraries.add("#include \"esp_bt.h\"  // Biblioteca para Bluetooth")
+            libraries.add("#include \"esp_bt_main.h\"  // Biblioteca principal do Bluedroid")
         if self.checkBox_ble.isChecked():
-            libraries.add("#include \"esp_bt.h\"  // Biblioteca para Bluetooth")
-            libraries.add("#include \"esp_gap_ble_api.h\"  // Biblioteca para BLE")
+            libraries.add("#include \"esp_gap_ble_api.h\"  // Biblioteca para BLE GAP")
+            libraries.add("#include \"esp_gatts_api.h\"  // Biblioteca para BLE GATT")
+            libraries.add("#include \"nvs_flash.h\"  // Biblioteca para NVS")
 
         # Adicionar bibliotecas ao código
         if libraries:
@@ -550,6 +566,7 @@ class Ui_MainWindow(object):
         if "GPIO" in peripherals_used or "Touch" in peripherals_used:
             code += "    gpio_config_t io_conf;\n"
         if "ADC" in peripherals_used:
+            code += "    // Variáveis para ADC\n"
             code += "    adc1_channel_t adc1_channel;\n"
             code += "    adc2_channel_t adc2_channel;\n"
             code += "    esp_adc_cal_characteristics_t adc_chars;\n"
@@ -561,6 +578,8 @@ class Ui_MainWindow(object):
             code += "    i2c_config_t conf;\n"
         if "SPI" in peripherals_used:
             code += "    spi_bus_config_t buscfg;\n"
+        if "PWM" in peripherals_used:
+            code += "    // Variáveis para PWM (LEDC)\n"
         code += "\n"
 
         # Funções de inicialização para ADC e DAC
@@ -637,6 +656,29 @@ class Ui_MainWindow(object):
                     code += "\n"
                     i2c_selected = False  # Evitar duplicação
 
+        # Inicialização do PWM
+        if pwm_pins:
+            code += f"    // Inicialização do PWM (LEDC)\n"
+            code += f"    // Configuração do timer do LEDC (PWM)\n"
+            code += f"    ledc_timer_config_t ledc_timer = {{\n"
+            code += f"        .duty_resolution = LEDC_TIMER_13_BIT, // Resolução do duty cycle\n"
+            code += f"        .freq_hz = 5000,                      // Frequência em Hz\n"
+            code += f"        .speed_mode = LEDC_LOW_SPEED_MODE,    // Modo de velocidade\n"
+            code += f"        .timer_num = LEDC_TIMER_0             // Número do timer\n"
+            code += f"    }};\n"
+            code += f"    ledc_timer_config(&ledc_timer);\n\n"
+            for pin_name, channel_num in pwm_pins:
+                code += f"    // Configuração do canal PWM para o pino {pin_name}\n"
+                code += f"    ledc_channel_config_t ledc_channel_{channel_num} = {{\n"
+                code += f"        .channel    = LEDC_CHANNEL_{channel_num},\n"
+                code += f"        .duty       = 0,\n"
+                code += f"        .gpio_num   = GPIO_{pin_name},\n"
+                code += f"        .speed_mode = LEDC_LOW_SPEED_MODE,\n"
+                code += f"        .hpoint     = 0,\n"
+                code += f"        .timer_sel  = LEDC_TIMER_0\n"
+                code += f"    }};\n"
+                code += f"    ledc_channel_config(&ledc_channel_{channel_num});\n\n"
+
         # Inicialização do HSPI
         if spi_hspi_selected:
             code += f"    // Configuração do HSPI\n"
@@ -663,34 +705,110 @@ class Ui_MainWindow(object):
 
         # Adicionar código de inicialização para Wi-Fi, Bluetooth e BLE
         if self.checkBox_wifi.isChecked():
-            code += f"    // Configuração do Wi-Fi\n"
-            code += f"    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();  // Configurações padrão\n"
-            code += f"    esp_wifi_init(&cfg);  // Inicializa Wi-Fi\n"
-            code += f"    esp_wifi_set_mode(WIFI_MODE_STA);  // Modo Station\n"
-            code += f"    esp_wifi_start();  // Inicia Wi-Fi\n"
-            code += f"    // Para configurar SSID e senha, utilize esp_wifi_set_config()\n"
+            code += f"    // Inicialização do Wi-Fi\n"
+            code += f"    esp_netif_init();\n"
+            code += f"    esp_event_loop_create_default();\n"
+            code += f"    esp_netif_create_default_wifi_sta();\n"
+            code += f"    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();\n"
+            code += f"    esp_wifi_init(&cfg);\n"
+            code += f"    esp_wifi_set_mode(WIFI_MODE_STA);\n"
+            code += f"    esp_wifi_start();\n"
+            code += f"    // Configure SSID e senha usando esp_wifi_set_config()\n"
             code += "\n"
 
         if self.checkBox_bluetooth.isChecked():
-            code += f"    // Configuração do Bluetooth\n"
-            code += f"    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();  // Configurações padrão\n"
-            code += f"    esp_bt_controller_init(&bt_cfg);  // Inicializa controlador BT\n"
-            code += f"    esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);  // Habilita Bluetooth clássico\n"
-            code += f"    // Adicione código para perfil e serviços Bluetooth\n"
+            code += f"    // Inicialização do Bluetooth Clássico\n"
+            code += f"    esp_err_t ret;\n"
+            code += f"    ret = nvs_flash_init();\n"
+            code += f"    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {{\n"
+            code += f"        ESP_ERROR_CHECK(nvs_flash_erase());\n"
+            code += f"        ret = nvs_flash_init();\n"
+            code += f"    }}\n"
+            code += f"    ESP_ERROR_CHECK(ret);\n\n"
+            code += f"    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();\n"
+            code += f"    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));\n"
+            code += f"    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT));\n"
+            code += f"    ESP_ERROR_CHECK(esp_bluedroid_init());\n"
+            code += f"    ESP_ERROR_CHECK(esp_bluedroid_enable());\n"
+            code += f"    // Adicione código para configurar o perfil SPP ou outros perfis Bluetooth clássicos\n"
             code += "\n"
 
         if self.checkBox_ble.isChecked():
-            code += f"    // Configuração do BLE\n"
-            code += f"    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();  // Configurações padrão\n"
-            code += f"    esp_bt_controller_init(&bt_cfg);  // Inicializa controlador BT\n"
-            code += f"    esp_bt_controller_enable(ESP_BT_MODE_BLE);  // Habilita BLE\n"
-            code += f"    esp_bluedroid_init();  // Inicializa Bluedroid\n"
-            code += f"    esp_bluedroid_enable();  // Habilita Bluedroid\n"
-            code += f"    // Adicione código para GAP, GATT e perfis BLE\n"
+            code += f"    // Inicialização do BLE\n"
+            code += f"    esp_err_t ret;\n"
+            code += f"    ret = nvs_flash_init();\n"
+            code += f"    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {{\n"
+            code += f"        ESP_ERROR_CHECK(nvs_flash_erase());\n"
+            code += f"        ret = nvs_flash_init();\n"
+            code += f"    }}\n"
+            code += f"    ESP_ERROR_CHECK(ret);\n\n"
+            code += f"    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();\n"
+            code += f"    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));\n"
+            code += f"    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));\n"
+            code += f"    ESP_ERROR_CHECK(esp_bluedroid_init());\n"
+            code += f"    ESP_ERROR_CHECK(esp_bluedroid_enable());\n"
+            code += f"    // Registro dos callbacks BLE\n"
+            code += f"    ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));\n"
+            code += f"    ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_event_handler));\n"
+            code += f"    ESP_ERROR_CHECK(esp_ble_gatts_app_register(0));\n"
+            code += f"    // Implemente as funções gap_event_handler e gatts_event_handler\n"
+            code += "\n"
+
+            # Código adicional para BLE (opcionalmente, você pode adicionar mais detalhes)
+            code += f"    // Exemplo de definição de dados de anúncio\n"
+            code += f"    esp_ble_adv_data_t adv_data = {{\n"
+            code += f"        .set_scan_rsp = false,\n"
+            code += f"        .include_name = true,\n"
+            code += f"        .include_txpower = true,\n"
+            code += f"        .min_interval = 0x0006,\n"
+            code += f"        .max_interval = 0x0010,\n"
+            code += f"        .appearance = 0x00,\n"
+            code += f"        .manufacturer_len = 0,\n"
+            code += f"        .p_manufacturer_data = NULL,\n"
+            code += f"        .service_data_len = 0,\n"
+            code += f"        .p_service_data = NULL,\n"
+            code += f"        .service_uuid_len = 16,\n"
+            code += f"        .p_service_uuid = NULL,\n"
+            code += f"        .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),\n"
+            code += f"    }};\n"
+            code += f"    esp_ble_gap_config_adv_data(&adv_data);\n"
             code += "\n"
 
         code += "    // Seu código aqui\n"
         code += "}\n"
+
+        # Adicionar funções de callback para BLE (se o BLE estiver selecionado)
+        if self.checkBox_ble.isChecked():
+            code += """
+// Função de callback para eventos GAP
+void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+    switch (event) {
+        case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+            // Inicia o anúncio
+            esp_ble_gap_start_advertising(&adv_params);
+            break;
+        default:
+            break;
+    }
+}
+
+// Função de callback para eventos GATTS
+void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
+    // Implementar manipulação de eventos GATTS
+}
+"""
+            # Adicionar parâmetros de anúncio (adv_params)
+            code += """
+// Parâmetros de anúncio
+esp_ble_adv_params_t adv_params = {
+    .adv_int_min        = 0x20,
+    .adv_int_max        = 0x40,
+    .adv_type           = ADV_TYPE_IND,
+    .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+    .channel_map        = ADV_CHNL_ALL,
+    .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
+"""
 
         # Exibir o código em uma nova janela
         self.show_code_window(code, project_name)
@@ -796,7 +914,14 @@ class Ui_MainWindow(object):
             "D32": "ADC1_CHANNEL_4", "D33": "ADC1_CHANNEL_5",
             "D34": "ADC1_CHANNEL_6", "D35": "ADC1_CHANNEL_7",
             "VP": "ADC1_CHANNEL_0", "VN": "ADC1_CHANNEL_3",
-            "D25": "ADC2_CHANNEL_8", "D26": "ADC2_CHANNEL_9"
+            "D25": "ADC2_CHANNEL_8", "D26": "ADC2_CHANNEL_9",
+            "D4": "ADC2_CHANNEL_0",
+            "D2": "ADC2_CHANNEL_2",
+            "D15": "ADC2_CHANNEL_3",
+            "D13": "ADC2_CHANNEL_4",
+            "D12": "ADC2_CHANNEL_5",
+            "D14": "ADC2_CHANNEL_6",
+            "D27": "ADC2_CHANNEL_7"
         }
         return adc_mapping.get(pin_name)
 
