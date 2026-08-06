@@ -1,0 +1,197 @@
+/* Projeto: {{ project_name }}
+
+   Este código foi gerado automaticamente pela ferramenta ESP32 Tool.
+
+   Instruções para compilação e upload:
+   1. Configure o ESP-IDF em seu ambiente.
+   2. Copie este código para o arquivo main.c de seu projeto.
+   3. No terminal, navegue até o diretório do projeto.
+   4. Execute 'idf.py build' para compilar o projeto.
+   5. Conecte o ESP32 e execute 'idf.py flash' para carregar o código.
+   
+   Para mais informações, visite: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/
+*/
+
+// Bibliotecas necessárias
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+{% for lib in libraries %}
+{{ lib }}
+{% endfor %}
+
+{% if pin_definitions %}
+// Definição dos pinos utilizados
+{% for def_line in pin_definitions %}
+{{ def_line }}
+{% endfor %}
+{% endif %}
+
+void app_main(void) {
+{% if needs_gpio_conf %}
+    gpio_config_t io_conf;
+{% endif %}
+{% if needs_adc %}
+    // Variáveis para ADC
+    adc1_channel_t adc1_channel;
+    adc2_channel_t adc2_channel;
+    esp_adc_cal_characteristics_t adc_chars;
+{% endif %}
+{% if needs_uart %}
+    uart_config_t uart_config;
+{% endif %}
+{% if needs_i2c %}
+    i2c_config_t conf;
+{% endif %}
+{% if needs_spi %}
+    spi_bus_config_t buscfg;
+{% endif %}
+
+{% if needs_adc %}
+    // Inicialização do ADC
+    adc1_config_width(ADC_WIDTH_BIT_12);
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc_chars);
+{% endif %}
+
+{% if dac_inits %}
+    // Inicialização do DAC
+    {% for dac_init in dac_inits %}
+    {{ dac_init }}
+    {% endfor %}
+{% endif %}
+
+{% for init in peripheral_inits %}
+    {{ init }}
+{% endfor %}
+
+{% if pwm_inits %}
+    // Inicialização do PWM (LEDC)
+    ledc_timer_config_t ledc_timer = {
+        .duty_resolution = LEDC_TIMER_13_BIT,
+        .freq_hz = 5000,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .timer_num = LEDC_TIMER_0
+    };
+    ledc_timer_config(&ledc_timer);
+
+    {% for pwm_init in pwm_inits %}
+    {{ pwm_init }}
+    {% endfor %}
+{% endif %}
+
+{% if hspi_init %}
+    // Configuração do HSPI
+    buscfg.miso_io_num = HSPI_MISO_PIN;
+    buscfg.mosi_io_num = HSPI_MOSI_PIN;
+    buscfg.sclk_io_num = HSPI_CLK_PIN;
+    buscfg.quadwp_io_num = -1;
+    buscfg.quadhd_io_num = -1;
+    buscfg.max_transfer_sz = 4096;
+    spi_bus_initialize(HSPI_HOST, &buscfg, 1);
+{% endif %}
+
+{% if vspi_init %}
+    // Configuração do VSPI
+    buscfg.miso_io_num = VSPI_MISO_PIN;
+    buscfg.mosi_io_num = VSPI_MOSI_PIN;
+    buscfg.sclk_io_num = VSPI_CLK_PIN;
+    buscfg.quadwp_io_num = -1;
+    buscfg.quadhd_io_num = -1;
+    buscfg.max_transfer_sz = 4096;
+    spi_bus_initialize(VSPI_HOST, &buscfg, 1);
+{% endif %}
+
+{% if wifi_init %}
+    // Inicialização do Wi-Fi
+    esp_netif_init();
+    esp_event_loop_create_default();
+    esp_netif_create_default_wifi_sta();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    esp_wifi_init(&cfg);
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_start();
+{% endif %}
+
+{% if bt_init %}
+    // Inicialização do Bluetooth Clássico
+    esp_err_t ret;
+    ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
+    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT));
+    ESP_ERROR_CHECK(esp_bluedroid_init());
+    ESP_ERROR_CHECK(esp_bluedroid_enable());
+{% endif %}
+
+{% if ble_init %}
+    // Inicialização do BLE
+    esp_err_t ret_ble;
+    ret_ble = nvs_flash_init();
+    if (ret_ble == ESP_ERR_NVS_NO_FREE_PAGES || ret_ble == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret_ble = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret_ble);
+
+    esp_bt_controller_config_t bt_cfg_ble = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg_ble));
+    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
+    ESP_ERROR_CHECK(esp_bluedroid_init());
+    ESP_ERROR_CHECK(esp_bluedroid_enable());
+    ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
+    ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_event_handler));
+    ESP_ERROR_CHECK(esp_ble_gatts_app_register(0));
+
+    esp_ble_adv_data_t adv_data = {
+        .set_scan_rsp = false,
+        .include_name = true,
+        .include_txpower = true,
+        .min_interval = 0x0006,
+        .max_interval = 0x0010,
+        .appearance = 0x00,
+        .manufacturer_len = 0,
+        .p_manufacturer_data = NULL,
+        .service_data_len = 0,
+        .p_service_data = NULL,
+        .service_uuid_len = 16,
+        .p_service_uuid = NULL,
+        .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
+    };
+    esp_ble_gap_config_adv_data(&adv_data);
+{% endif %}
+    // Seu código aqui
+}
+
+{% if ble_init %}
+// Função de callback para eventos GAP
+void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+    switch (event) {
+        case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+            esp_ble_gap_start_advertising(&adv_params);
+            break;
+        default:
+            break;
+    }
+}
+
+// Função de callback para eventos GATTS
+void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
+    // Implementar manipulação de eventos GATTS
+}
+
+// Parâmetros de anúncio
+esp_ble_adv_params_t adv_params = {
+    .adv_int_min        = 0x20,
+    .adv_int_max        = 0x40,
+    .adv_type           = ADV_TYPE_IND,
+    .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+    .channel_map        = ADV_CHNL_ALL,
+    .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
+{% endif %}
