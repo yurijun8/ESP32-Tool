@@ -1,74 +1,77 @@
 # ESP32-Tool
 
-### Descrição
+### Description
 
-ESP32 Tool é uma aplicação gráfica desenvolvida com Python e PyQt5 que facilita a configuração e geração de códigos de inicialização para os periféricos do ESP32. A ferramenta permite que você selecione os periféricos desejados para cada pino disponível e gera automaticamente o código de configuração correspondente em C para o framework ESP-IDF.
+ESP32 Tool is a graphical desktop application built with Python and PyQt5 that simplifies the configuration and generation of starter code for ESP32 peripherals. The tool allows you to select the desired peripherals for each available pin and automatically generates the corresponding C configuration code for the ESP-IDF framework.
 
-### Funcionalidades
+### Features
 
-- **Seleção intuitiva de periféricos para os pinos disponíveis no ESP32**.
+- **Intuitive peripheral selection for available ESP32 pins.**
   
-- **Suporte para diversos periféricos:**
-    - GPIO (Entrada e Saída)
-    - PWM
-    - ADC (Conversor Analógico-Digital)
-    - DAC (Conversor Digital-Analógico)
+- **Support for various peripherals:**
+    - GPIO (Input and Output)
+    - PWM (LEDC)
+    - ADC (Analog-to-Digital Converter)
+    - DAC (Digital-to-Analog Converter)
     - UART
     - I2C (Master/Slave)
-    - SPI (Master/Slave)
+    - SPI (Master/Slave - HSPI/VSPI)
     - Touch Pad
-    - Opções de ativação para Wi-Fi, Bluetooth e BLE.
+    - Toggles for Wi-Fi, Bluetooth, and BLE.
     
-- **Geração automática do código em C com:**
-    Cabeçalho comentado.
-    Inicialização dos periféricos selecionados.
-    Exportação do código gerado como arquivo .c.
-    Copiar código gerado para a área de transferência.
+- **Automatic C code generation featuring:**
+    - Commented header with setup instructions.
+    - Modular initialization of selected peripherals using Jinja2 templates.
+    - Exporting the generated code as a `.c` file.
+    - Copying the generated code directly to the clipboard.
+    - Syntax highlighting support in the code preview window.
+- **Project Presets:**
+    - Save and load your configuration states using JSON preset files.
 
-  ### Pré-requisitos
+### Prerequisites
 
 1. **Python 3.7+**
-   - Instale o Python: [https://www.python.org/downloads/](https://www.python.org/downloads/)
+   - Install Python: [https://www.python.org/downloads/](https://www.python.org/downloads/)
 
-2. **Dependências Python**
-   - Instale os pacotes necessários com:
+2. **Python Dependencies**
+   - Install the required packages with:
      ```bash
      pip install -r requirements.txt
      ```
 
 3. **ESP-IDF**
-   - Configurado e instalado no seu ambiente de desenvolvimento.
-   - Instruções: [Get Started with ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
+   - Configured and installed in your development environment.
+   - Instructions: [Get Started with ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
 
-4. **Imagem ESP32**
-   - Certifique-se de ter a imagem `esp32-wroom-32.png` no mesmo diretório do projeto.
+4. **ESP32 Image & Assets**
+   - Ensure the board image `esp32-wroom-32.png` is located inside the `src/` directory.
 
-### Como Usar
+### How to Use
 
-1. **Iniciar a aplicação**
-   - Execute o arquivo principal:
+1. **Start the application**
+   - Execute the main entry point:
      ```bash
-     python esp32_tool.py
+     python main.py
      ```
 
-2. **Configurar os periféricos**
-   - Insira o nome do projeto no campo de texto superior.
-   - Selecione os periféricos desejados para cada pino utilizando os menus suspensos (ComboBoxes) à esquerda e à direita da interface.
-   - Ative as opções de Wi-Fi, Bluetooth ou BLE, se necessário.
+2. **Configure the peripherals**
+   - Enter your project name in the top input field.
+   - Select the desired peripherals for each pin using the dropdown menus (ComboBoxes) on the left and right sides of the interface.
+   - Toggle Wi-Fi, Bluetooth, or BLE options if needed.
+   - Optionally, use the **Save Preset** or **Load Preset** buttons to manage configuration profiles.
 
-3. **Gerar o código**
-   - Clique no botão **Generate Code**.
-   - O código será exibido em uma nova janela.
-   - Você pode copiá-lo para a área de transferência ou exportá-lo como arquivo `.c`.
+3. **Generate the code**
+   - Click the **Generate Code** button.
+   - The code will be displayed in a new syntax-highlighted window.
+   - You can copy it to your clipboard or export it as a `.c` file.
 
-4. **Compilar e carregar o código no ESP32**
-   - Copie o código gerado para o arquivo `main.c` de um projeto ESP-IDF.
-   - Compile o projeto:
+4. **Build and flash the code to the ESP32**
+   - Copy the generated code into the `main.c` file of an ESP-IDF project.
+   - Build the project:
      ```bash
      idf.py build
      ```
-   - Carregue o código no ESP32:
+   - Flash the code to your ESP32 board:
      ```bash
      idf.py flash
      ```
-

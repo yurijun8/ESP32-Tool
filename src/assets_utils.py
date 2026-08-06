@@ -1,3 +1,8 @@
+'''
+This file contains utility functions for managing assets in the application. It provides a function to retrieve the absolute path to resources, 
+ensuring compatibility with both development and PyInstaller environments.
+'''
+
 import sys
 import os
 
